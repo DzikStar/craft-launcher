@@ -7,7 +7,7 @@ use super::detect::system_lang;
 
 /// One supported UI language.
 pub struct LangInfo {
-    /// Canonical BCP 47 code (`en`, `ru`, `zh-CN`, `de`, `fr`). Also the `interfaceLanguage` value.
+    /// Canonical BCP 47 code (`en`, `ru`, `zh-CN`, `de`, `fr`, `pt-BR`, `pl`). Also the `interfaceLanguage` value.
     pub code: &'static str,
     /// The language's name in itself, shown in the Preferences dropdown.
     pub name: &'static str,
@@ -18,8 +18,8 @@ pub struct LangInfo {
     pub cjk: bool,
     /// Catalog file contents (empty for the built-in English).
     pub source: &'static str,
-    /// Plural form index for a count (English and German: 0 = one, 1 = other; Russian: 0 = one,
-    /// 1 = few, 2 = many; French: 0 = one for 0 and 1; Chinese: always 0).
+    /// Plural form index for a count (English and German: 0 = one, 1 = other; Russian, Ukrainian
+    /// and Polish: 0 = one, 1 = few, 2 = many; French: 0 = one for 0 and 1; Chinese: always 0).
     pub plural: fn(u64) -> usize,
     /// Number of plural forms the catalog's `@plural` rows carry (checked by tests).
     pub plural_forms: usize,
@@ -42,7 +42,7 @@ fn plural_none(_: u64) -> usize {
     0
 }
 
-/// Russian and Ukrainian integer counts: 1 (but not 11) is `one`, 2–4 (but not 12–14)
+/// Russian, Ukrainian and Polish integer counts: 1 (but not 11) is `one`, 2–4 (but not 12–14)
 /// `few`, everything else `many`.
 pub(super) fn plural_east_slavic(n: u64) -> usize {
     match n % 100 {
@@ -56,7 +56,7 @@ pub(super) fn plural_east_slavic(n: u64) -> usize {
 }
 
 /// The registry. English first: it is the fallback and the source language.
-pub static LANGUAGES: [LangInfo; 6] = [
+pub static LANGUAGES: [LangInfo; 7] = [
     LangInfo {
         code: "en",
         name: "English",
@@ -123,6 +123,17 @@ pub static LANGUAGES: [LangInfo; 6] = [
         complete_menus: true,
         catalog: OnceLock::new(),
     },
+    LangInfo {
+        code: "pl",
+        name: "Polski",
+        english_name: "Polish",
+        cjk: false,
+        source: include_str!("pl.tsv"),
+        plural: plural_east_slavic,
+        plural_forms: 3,
+        complete_menus: true,
+        catalog: OnceLock::new(),
+    },
 ];
 
 impl LangInfo {
@@ -156,6 +167,7 @@ impl Lang {
     pub const DE: Lang = Lang(&LANGUAGES[3]);
     pub const FR: Lang = Lang(&LANGUAGES[4]);
     pub const PT_BR: Lang = Lang(&LANGUAGES[5]);
+    pub const PL: Lang = Lang(&LANGUAGES[6]);
 
     pub fn code(self) -> &'static str {
         self.0.code

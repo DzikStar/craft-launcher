@@ -209,6 +209,26 @@ fn russian_plural_rule_works() {
 }
 
 #[test]
+fn polish_plural_rule_works() {
+    // Polish integer counts follow the same one/few/many rule the Russian catalog uses.
+    for n in [1, 21, 31, 101] {
+        assert_eq!(plural_east_slavic(n), 0, "{n}");
+    }
+    for n in [2, 3, 4, 22, 23, 24, 102, 122] {
+        assert_eq!(plural_east_slavic(n), 1, "{n}");
+    }
+    for n in [0, 5, 11, 12, 13, 14, 15, 25, 100, 111, 112] {
+        assert_eq!(plural_east_slavic(n), 2, "{n}");
+    }
+    assert_eq!(trn(Lang::PL, 1, "{n} app", "{n} apps"), "1 aplikacja");
+    assert_eq!(trn(Lang::PL, 3, "{n} app", "{n} apps"), "3 aplikacje");
+    assert_eq!(trn(Lang::PL, 22, "{n} app", "{n} apps"), "22 aplikacje");
+    assert_eq!(trn(Lang::PL, 5, "{n} app", "{n} apps"), "5 aplikacji");
+    // A key the Polish catalog doesn't carry falls back to the English forms.
+    assert_eq!(trn(Lang::PL, 3, "{n} unknown item", "{n} unknown items"), "3 unknown items");
+}
+
+#[test]
 fn untranslated_plurals_fall_back_to_english_by_count() {
     // Russian's rule says "one" for 21, but English says "other".
     assert_eq!(trn(Lang::RU, 21, "{n} unknown item", "{n} unknown items"), "21 unknown items");
@@ -263,6 +283,14 @@ fn french_locales_and_plurals_work() {
     assert_eq!(trn(Lang::FR, 1, "{n} app", "{n} apps"), "1 application");
     assert_eq!(trn(Lang::FR, 2, "{n} app", "{n} apps"), "2 applications");
     assert_eq!(trn(Lang::FR, 3, "{n} day ago", "{n} days ago"), "il y a 3 jours");
+}
+
+#[test]
+fn polish_locales_resolve() {
+    for tag in ["pl", "pl-PL", "pl_PL.UTF-8", "PL_pl"] {
+        assert_eq!(lang_from_tag(tag), Some(Lang::PL), "{tag}");
+    }
+    assert_eq!(super::detect::first_supported(["xx-XX", "pl-PL", "en-US"]), Some(Lang::PL));
 }
 
 #[test]
