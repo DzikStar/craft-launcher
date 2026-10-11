@@ -7,7 +7,7 @@ use super::detect::system_lang;
 
 /// One supported UI language.
 pub struct LangInfo {
-    /// Canonical BCP 47 code (`en`, `ru`, `zh-CN`, `de`, `fr`). Also the `interfaceLanguage` value.
+    /// Canonical BCP 47 code (`en`, `ru`, `zh-CN`, `de`, `fr`, `cs`). Also the `interfaceLanguage` value.
     pub code: &'static str,
     /// The language's name in itself, shown in the Preferences dropdown.
     pub name: &'static str,
@@ -19,7 +19,8 @@ pub struct LangInfo {
     /// Catalog file contents (empty for the built-in English).
     pub source: &'static str,
     /// Plural form index for a count (English and German: 0 = one, 1 = other; Russian: 0 = one,
-    /// 1 = few, 2 = many; French: 0 = one for 0 and 1; Chinese: always 0).
+    /// 1 = few, 2 = many; Czech: 0 = one, 1 = few, 2 = other; French: 0 = one for 0 and 1;
+    /// Chinese: always 0).
     pub plural: fn(u64) -> usize,
     /// Number of plural forms the catalog's `@plural` rows carry (checked by tests).
     pub plural_forms: usize,
@@ -55,8 +56,17 @@ pub(super) fn plural_east_slavic(n: u64) -> usize {
     }
 }
 
+/// Czech integer counts: 1 is `one`, 2–4 are `few`, everything else is `other`.
+pub(super) fn plural_czech(n: u64) -> usize {
+    match n {
+        1 => 0,
+        2..=4 => 1,
+        _ => 2,
+    }
+}
+
 /// The registry. English first: it is the fallback and the source language.
-pub static LANGUAGES: [LangInfo; 6] = [
+pub static LANGUAGES: [LangInfo; 7] = [
     LangInfo {
         code: "en",
         name: "English",
@@ -123,6 +133,17 @@ pub static LANGUAGES: [LangInfo; 6] = [
         complete_menus: true,
         catalog: OnceLock::new(),
     },
+    LangInfo {
+        code: "cs",
+        name: "Čeština",
+        english_name: "Czech",
+        cjk: false,
+        source: include_str!("cs.tsv"),
+        plural: plural_czech,
+        plural_forms: 3,
+        complete_menus: true,
+        catalog: OnceLock::new(),
+    },
 ];
 
 impl LangInfo {
@@ -156,6 +177,7 @@ impl Lang {
     pub const DE: Lang = Lang(&LANGUAGES[3]);
     pub const FR: Lang = Lang(&LANGUAGES[4]);
     pub const PT_BR: Lang = Lang(&LANGUAGES[5]);
+    pub const CS: Lang = Lang(&LANGUAGES[6]);
 
     pub fn code(self) -> &'static str {
         self.0.code
