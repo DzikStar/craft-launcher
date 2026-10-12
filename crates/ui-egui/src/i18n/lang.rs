@@ -18,8 +18,9 @@ pub struct LangInfo {
     pub cjk: bool,
     /// Catalog file contents (empty for the built-in English).
     pub source: &'static str,
-    /// Plural form index for a count (English and German: 0 = one, 1 = other; Russian, Ukrainian
-    /// and Polish: 0 = one, 1 = few, 2 = many; French: 0 = one for 0 and 1; Chinese: always 0).
+    /// Plural form index for a count (English and German: 0 = one, 1 = other; Russian: 0 = one,
+    /// 1 = few, 2 = many; Polish: 0 = one only for 1, 1 = few, 2 = many; French: 0 = one for 0
+    /// and 1; Chinese: always 0).
     pub plural: fn(u64) -> usize,
     /// Number of plural forms the catalog's `@plural` rows carry (checked by tests).
     pub plural_forms: usize,
@@ -42,7 +43,7 @@ fn plural_none(_: u64) -> usize {
     0
 }
 
-/// Russian, Ukrainian and Polish integer counts: 1 (but not 11) is `one`, 2–4 (but not 12–14)
+/// Russian and Ukrainian integer counts: 1 (but not 11) is `one`, 2–4 (but not 12–14)
 /// `few`, everything else `many`.
 pub(super) fn plural_east_slavic(n: u64) -> usize {
     match n % 100 {
@@ -52,6 +53,18 @@ pub(super) fn plural_east_slavic(n: u64) -> usize {
             2..=4 => 1,
             _ => 2,
         },
+    }
+}
+
+/// Polish integer counts: only 1 itself is `one` (21 is "21 aplikacji"), 2–4 in the last digit
+/// (but not 12–14) `few`, everything else `many`.
+pub(super) fn plural_polish(n: u64) -> usize {
+    if n == 1 {
+        0
+    } else if matches!(n % 10, 2..=4) && !matches!(n % 100, 12..=14) {
+        1
+    } else {
+        2
     }
 }
 
@@ -129,7 +142,7 @@ pub static LANGUAGES: [LangInfo; 7] = [
         english_name: "Polish",
         cjk: false,
         source: include_str!("pl.tsv"),
-        plural: plural_east_slavic,
+        plural: plural_polish,
         plural_forms: 3,
         complete_menus: true,
         catalog: OnceLock::new(),
