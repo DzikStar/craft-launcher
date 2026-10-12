@@ -4,7 +4,8 @@
 //! # Adding a language
 //! 1. Add `xx.tsv` next to `ru.tsv` (copy its header; translate from the *meaning* of the
 //!    English text, clean-room).
-//! 2. Add one row to [`LANGUAGES`] (code, native name, catalog, plural rule). A translation
+//! 2. Add one row to [`LANGUAGES`] (code, native name, catalog, plural rule). For a complete
+//!    catalog, cover every UI literal and plural key; the tests enforce that claim. A translation
 //!    that isn't finished yet starts with `complete_menus: false`: it still shows in
 //!    Preferences, strings without a row fall back to English, and the completeness tests
 //!    skip it until every row is done.
