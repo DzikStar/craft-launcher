@@ -112,8 +112,9 @@ fn snapshot(h: &mut Harness<'_, Option<LauncherUi>>, name: &str) {
 }
 
 /// What a table header needs in points: its label in the HUD face, upper case, plus the sort
-/// arrow. This mirrors what `views::table` gives the column as its floor and what the header
-/// cell claims as its width; the two must always agree.
+/// arrow. The recipe repeats `widgets::hud_width` (private to the crate) on purpose: this way
+/// the rendered columns are checked against the face and spacing independently, through the
+/// same `theme` constants.
 fn header_needs(ctx: &egui::Context, label: &str) -> f32 {
     let format = egui::TextFormat {
         font_id: egui::FontId::new(theme::HUD_SIZE, theme::mono()),
@@ -145,6 +146,7 @@ fn table_headers_fit_in_every_language() {
             let needs = header_needs(&h.ctx, label);
             let node = h.get_by_label(label);
             let has = node.rect().width();
+            // Half a point of slack: node rects are rounded to the pixel grid.
             assert!(has + 1.0 >= needs, "{}: \"{label}\" needs {needs:.1} points but its column is {has:.1}", lang.code());
         }
     }
