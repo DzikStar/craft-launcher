@@ -64,6 +64,23 @@ const CARD_PAD: f32 = 20.0;
 /// Room macOS's traffic lights take at the left of the header.
 const TRAFFIC_LIGHTS_W: f32 = 72.0;
 
+/// One table column: the key its header sorts by (`None` for a column without one, like the
+/// actions), the header's label in this language, and the width the column was designed with.
+#[derive(Clone, Copy)]
+struct TableHeader<'a> {
+    key: Option<SortKey>,
+    label: &'a str,
+    designed: f32,
+}
+
+/// The width a column's header needs in this language: its label in the HUD face, upper case,
+/// plus the sort arrow — never less than the width the column was designed with. A column
+/// without a header keeps its designed width. This is both what a column is opened at and what
+/// its header cell claims (see [`LauncherUi::table`]), so the two can't drift apart.
+fn header_width(ctx: &egui::Context, header: &TableHeader<'_>) -> f32 {
+    (widgets::hud_width(ctx, header.label) + theme::HEADER_ARROW_W).max(header.designed)
+}
+
 impl LauncherUi {
     /// The header bar; with a custom or macOS title bar it is also the window's title bar.
     pub(crate) fn header(&mut self, ui: &mut Ui, bar: TitleBar) {
@@ -510,65 +527,63 @@ impl LauncherUi {
             ui.ctx().layer_painter(ui.layer_id()).with_clip_rect(clip).hline(span, y, t.hairline());
         };
         egui::Frame::new().fill(t.bg).stroke(t.hairline()).inner_margin(egui::Margin::symmetric(16, 0)).show(ui, |ui| {
-            // The sort key each header toggles, its label in this language, and the width the
-            // table was designed with. A column is never narrower than that, whatever the
-            // language: a longer localized header (Polish "Zainstalowana") widens its column
-            // instead of being cut off.
-            let headers: [(Option<SortKey>, &str, f32); 6] = [
-                (Some(SortKey::Name), tl!("App"), 220.0),
-                (Some(SortKey::Status), tl!("Status"), 176.0),
-                (Some(SortKey::Installed), tr_ctx(current(), "column", "Installed"), 84.0),
-                (Some(SortKey::Latest), tr_ctx(current(), "column", "Latest"), 84.0),
-                (Some(SortKey::Released), tr_ctx(current(), "column", "Released"), 104.0),
-                (None, "", 206.0),
+            // Every column holds at least the width it was designed with, and `Column::auto`
+            // grows it to whatever its widest cell claims. The header claims (and paints) its
+            // label plus the sort arrow — never the whole cell — so a localized header wider
+            // than the designed width (Polish "Zainstalowana") widens its column instead of
+            // being cut off, and a row's buttons or badges can widen it further.
+            let headers: [TableHeader; 6] = [
+                TableHeader { key: Some(SortKey::Name), label: tl!("App"), designed: 220.0 },
+                TableHeader { key: Some(SortKey::Status), label: tl!("Status"), designed: 176.0 },
+                TableHeader { key: Some(SortKey::Installed), label: tr_ctx(current(), "column", "Installed"), designed: 84.0 },
+                TableHeader { key: Some(SortKey::Latest), label: tr_ctx(current(), "column", "Latest"), designed: 84.0 },
+                TableHeader { key: Some(SortKey::Released), label: tr_ctx(current(), "column", "Released"), designed: 104.0 },
+                // The actions column has no header.
+                TableHeader { key: None, label: "", designed: 206.0 },
             ];
-            // What a header needs in this language: its label plus the sort arrow. The table
-            // opens at this width, and each column then holds at least its widest cell — the
-            // header claiming the same width below, so the two always agree.
-            let header_width = |label: &str, min: f32| {
-                if label.is_empty() { min } else { (widgets::hud_galley(ui, label, Color32::PLACEHOLDER).size().x + theme::HEADER_ARROW_W).max(min) }
-            };
-            let widths: [f32; 6] = headers.map(|(_, label, min)| header_width(label, min));
+            let ctx = ui.ctx().clone();
+            let sized = |h: &TableHeader<'_>| Column::auto_with_initial_suggestion(header_width(&ctx, h)).at_least(h.designed);
+            let [app, status, installed, latest, released, actions] = headers;
             TableBuilder::new(ui)
                 .striped(false)
                 .vscroll(false)
                 .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-                .column(Column::remainder().at_least(headers[0].2).clip(true))
-                .column(Column::auto_with_initial_suggestion(widths[1]).at_least(headers[1].2))
-                .column(Column::auto_with_initial_suggestion(widths[2]).at_least(headers[2].2))
-                .column(Column::auto_with_initial_suggestion(widths[3]).at_least(headers[3].2))
-                .column(Column::auto_with_initial_suggestion(widths[4]).at_least(headers[4].2))
-                .column(Column::auto_with_initial_suggestion(widths[5]).at_least(headers[5].2))
+                .column(Column::remainder().at_least(app.designed).clip(true))
+                .column(sized(&status))
+                .column(sized(&installed))
+                .column(sized(&latest))
+                .column(sized(&released))
+                .column(sized(&actions))
                 .header(42.0, |mut header| {
-                    for (key, label, _) in headers {
+                    for spec in headers {
                         header.col(|ui| {
-                            if key == Some(SortKey::Name) {
+                            if spec.key == Some(SortKey::Name) {
                                 rule(ui);
                             }
-                            let Some(k) = key else { return };
-                            let active = k == self.settings.sort;
-                            let tip = if active { tl!("Click to reverse the order") } else { tl!("Click to sort by this column") };
+                            if spec.label.is_empty() {
+                                return;
+                            }
+                            let active = spec.key == Some(self.settings.sort);
                             // The whole cell is the sort target; the label paints at its left.
                             let cell = ui.max_rect();
-                            let resp = ui.interact(cell, ui.id().with(("header-sort", label)), Sense::click());
-                            let hovered = resp.hovered();
+                            let resp = spec.key.map(|_| ui.interact(cell, ui.id().with(("header-sort", spec.label)), Sense::click()));
+                            let hovered = resp.as_ref().is_some_and(|r| r.hovered());
                             let color = if active || hovered { t.ink_strong } else { t.faint };
-                            let galley = widgets::hud_galley(ui, label, color);
-                            // Claim only the label plus the sort arrow — never the whole cell: an
-                            // auto-sized column then measures exactly what the header draws, so a
-                            // localized header wider than the column widens it instead of clipping.
-                            let _ = ui.allocate_space(vec2(galley.size().x + theme::HEADER_ARROW_W, ui.available_height()));
+                            let galley = widgets::hud_galley(ui, spec.label, color);
+                            // Claim the width the column needs for this header — never the whole
+                            // cell — so an auto-sized column measures exactly what the header
+                            // draws. `allocate_space` claims it without a widget of its own: the
+                            // sort target above stays the only interactive thing in the cell.
+                            let _ = ui.allocate_space(vec2(header_width(&ctx, &spec), ui.available_height()));
                             let text_pos = egui::pos2(cell.left(), cell.center().y - galley.size().y / 2.0);
                             let arrow_x = text_pos.x + galley.size().x + 4.0;
                             let p = ui.painter();
                             p.galley(text_pos, galley, color);
                             // ▲ / ▼ for the active column; a faint hint on hover.
-                            let arrow = if active {
-                                Some(self.settings.sort_descending)
-                            } else if hovered {
-                                Some(k.starts_descending())
-                            } else {
-                                None
+                            let arrow = match spec.key {
+                                Some(_) if active => Some(self.settings.sort_descending),
+                                Some(k) if hovered => Some(k.starts_descending()),
+                                _ => None,
                             };
                             if let Some(down) = arrow {
                                 let c = egui::pos2(arrow_x + 4.0, cell.center().y);
@@ -577,9 +592,12 @@ impl LauncherUi {
                                 let arrow_color = if active { t.accent_ink } else { t.faint };
                                 p.add(egui::Shape::convex_polygon(pts, arrow_color, Stroke::NONE));
                             }
-                            resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, label));
-                            if resp.on_hover_text(tip).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
-                                sort_clicked = Some(k);
+                            if let (Some(k), Some(resp)) = (spec.key, resp) {
+                                let tip = if active { tl!("Click to reverse the order") } else { tl!("Click to sort by this column") };
+                                resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, true, spec.label));
+                                if resp.on_hover_text(tip).on_hover_cursor(egui::CursorIcon::PointingHand).clicked() {
+                                    sort_clicked = Some(k);
+                                }
                             }
                         });
                     }

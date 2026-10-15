@@ -26,9 +26,26 @@ pub fn caps(ui: &Ui, text: &str, size: f32, family: egui::FontFamily, spacing: f
     ui.painter().layout_job(egui::text::LayoutJob::single_section(text.to_uppercase(), format))
 }
 
+/// The layout job of a `.hud-label`: [`caps`]'s recipe in the theme's HUD face.
+fn hud_job(text: &str, color: Color32) -> egui::text::LayoutJob {
+    let format = egui::TextFormat {
+        font_id: egui::FontId::new(theme::HUD_SIZE, theme::mono()),
+        color,
+        extra_letter_spacing: theme::HUD_SPACING,
+        ..Default::default()
+    };
+    egui::text::LayoutJob::single_section(text.to_uppercase(), format)
+}
+
 /// A `.hud-label`: 11 px Geist Mono, upper case, widely spaced.
 pub fn hud_galley(ui: &Ui, text: &str, color: Color32) -> Arc<Galley> {
-    caps(ui, text, theme::HUD_SIZE, theme::mono(), theme::HUD_SPACING, color)
+    ui.painter().layout_job(hud_job(text, color))
+}
+
+/// The width a HUD label takes, without painting it: the same layout [`hud_galley`] draws, for
+/// measuring where the `Ui` is borrowed elsewhere and only the context is at hand.
+pub fn hud_width(ctx: &egui::Context, text: &str) -> f32 {
+    ctx.fonts_mut(|f| f.layout_job(hud_job(text, Color32::PLACEHOLDER))).size().x
 }
 
 /// Paints `galley` at the left of `rect`, centred vertically.
