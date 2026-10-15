@@ -132,12 +132,15 @@ fn table_headers_fit_in_every_language() {
         let mut h = harness(lang.code());
         h.run_steps(8);
         snapshot(&mut h, &format!("table-headers-{}", lang.code()));
+        // A CJK language is drawn in English where the system has no CJK font (`effective_lang`):
+        // the headers then read English too.
+        let shown = if lang.needs_cjk_font() && !theme::cjk_font_available(lang) { Lang::EN } else { lang };
         for label in [
-            tr(lang, "App"),
-            tr(lang, "Status"),
-            tr_ctx(lang, "column", "Installed"),
-            tr_ctx(lang, "column", "Latest"),
-            tr_ctx(lang, "column", "Released"),
+            tr(shown, "App"),
+            tr(shown, "Status"),
+            tr_ctx(shown, "column", "Installed"),
+            tr_ctx(shown, "column", "Latest"),
+            tr_ctx(shown, "column", "Released"),
         ] {
             let needs = header_needs(&h.ctx, label);
             let node = h.get_by_label(label);
